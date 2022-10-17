@@ -1,0 +1,23 @@
+{"id": "7b0bb047-c8a5-4a04-b9b1-ee4bfc07c05b",
+  "imdb_rating": 4.42
+  "genre": "lala",
+  "title": "my title",
+  "description": "desc text"
+  "director": "dir dir ",
+  "actors_names": "actor1actor2"
+  "writers_names": "w1w2"
+  "actors": [{
+      "id": "7b0bb047-c8a5-4a04-b9b1-ee4bfc07c05b"
+      "name": "nest name 1"
+    },{
+        "id": "7b0bb047-c3a5-4a04-b9b1-ee4bfc07c05b"
+        "name": "nest name 2"
+      }],
+  "writers": [{
+    "id": "7b0bb047-c8a5-4a04-b9b1-ee4bfc07c05b"
+    "name": "nest wr 1"
+  },{
+      "id": "7b0bb047-c3a5-4a04-b9b1-ee4bfc07c05b"
+      "name": "nest wr2"
+    }]
+}

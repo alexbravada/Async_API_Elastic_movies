@@ -1,0 +1,50 @@
+version: "3.7"
+networks:
+  internal:
+    # Use a custom driver
+    driver: bridge
+services:
+  app:
+    build: AsyncApi
+    ports:
+      - "8106:8106"
+    depends_on:
+      - db
+    networks:
+      internal:
+  db:
+    image: postgres:13
+    volumes:
+      - ./pg_data/data:/var/lib/postgresql/data/
+    networks:
+      internal:
+  es01:
+    image: elasticsearch:7.7.0
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - http.compression=true
+      - http.max_content_length=500mb
+      - xpack.security.enabled=false
+    depends_on:
+      - es01
+    networks:
+      internal:
+  redis01:
+    image: redislabs/rejson:2.2.0
+    depends_on:
+      - db
+    networks:
+      internal:
+  nginx:
+    image: nginx:1.23.1
+    volumes:
+      - ./src/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./src/conf.d/:/etc/nginx/conf.d/:ro
+      - ./src/static/:/data/:ro
+    networks:
+      internal:
+    depends_on:
+      - app
+    ports:
+      - "80:80"

@@ -1,0 +1,6 @@
+Detail Film =  models.Film   # single JSON
+Short Film for fast view = AllShortOutput <- models.FilmShort
+Films(Short) sorted by genre = AllShortOutput <- models.FilmShort
+
+/api/v1/genres/
+All Genres = AllShortOutput <- models.Genre

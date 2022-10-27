@@ -5,11 +5,13 @@ networks:
     driver: bridge
 services:
   app:
-    build: AsyncApi
+    build: .
     ports:
       - "8106:8106"
     depends_on:
       - db
+      - redis01
+      - es01
     networks:
       internal:
   db:
@@ -27,15 +29,24 @@ services:
       - http.max_content_length=500mb
       - xpack.security.enabled=false
     depends_on:
-      - es01
+      - db
     networks:
       internal:
   redis01:
     image: redislabs/rejson:2.2.0
-    depends_on:
-      - db
     networks:
       internal:
+  tests:
+    image: app
+    depends_on:
+      - redis01
+      - es01
+      - app
+    entrypoint: >
+      sh -c "pip install -r /tests/functional/requirements.txt
+      && python3 /tests/functional/utils/wait_for_es.py
+      && python3 /tests/functional/utils/wait_for_redis.py
+      && pytest /tests/functional/src"
   nginx:
     image: nginx:1.23.1
     volumes:

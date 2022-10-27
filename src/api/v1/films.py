@@ -20,7 +20,7 @@ router = APIRouter()
 async def film_details(
     film_id: str, film_service: FilmService = Depends(get_film_service)
 ) -> Film:
-    redis_key = f'movies-get-film-/api/v1/films/{film_id}'
+    redis_key = f'api/v1/films/{film_id}'
     film = await film_service.get_by_id(redis_key, film_id)
     if not film:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail='film not found')
@@ -36,7 +36,7 @@ async def get_film_list(
     film_service: FilmService = Depends(get_film_service),
 ) -> AllShortFilms:
     """Returns list of films with id, title, imdb_rating """
-    redis_key = f'movies-get-film-/api/v1/films/pnum:{pagination.page_number}-psize:{pagination.page_size}-filter:{filter_by.filter_by_genre}:{filter_by.filter_by_director}'
+    redis_key = f'api/v1/films/pnum:{pagination.page_number}-psize:{pagination.page_size}-filter:{filter_by.filter_by_genre}:{filter_by.filter_by_director}'
     film = await film_service.get_paginated_movies(
         redis_key,
         offset=pagination.offset,

@@ -1,3 +1,4 @@
+import json
 from http import HTTPStatus
 from fastapi import APIRouter, Depends, HTTPException
 from models.film import Person, AllShortFilms, FilmShort, Persons
@@ -12,7 +13,7 @@ async def person_details(
     person_id: str, person_service: PersonService = Depends(get_persons_service)
 ) -> Person:
     """return info about single person"""
-    redis_key = f'movies-get-film-/api/v1/persons/{person_id}'
+    redis_key = f'api/v1/persons/{person_id}'
     person = await person_service.get_person_by_id(redis_key, person_id)
 
     if not person:
@@ -33,7 +34,7 @@ async def get_person_film_list(
         returns all person roles and films by role
         example: /api/v1/persons/00395304-dd52-4c7b-be0d-c2cd7a495684/film/
     """
-    redis_key = f'movies-get-film-/api/v1/persons/{person_id}/film/'
+    redis_key = f'api/v1/persons/{person_id}/film/'
     film = await person_service.get_films_by_person_id(
         redis_key, offset=pagination.offset, limit=pagination.page_size, person_id=person_id
     )
@@ -67,10 +68,10 @@ async def search_persons_by_query(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='persons by query not found'
         )
-    search_res = person
+
     amount = len(person)
     responce = Persons(
-        results=search_res,
+        results=[Person(**i) for i in person],
         amount_results=amount,
         page_size=pagination.page_size,
         page_number=pagination.page_number,

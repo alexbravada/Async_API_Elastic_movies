@@ -18,7 +18,7 @@ docker-compose up -d --build
 ```
 ## Запуск тестов:
 ```shell
-pytest ./tests/functional/
+pytest ./tests/functional/src
 ```
 
 

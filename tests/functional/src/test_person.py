@@ -1,4 +1,6 @@
 import json
+from http import HTTPStatus
+
 import pytest
 
 from tests.functional.settings import test_settings_persons, test_settings_films
@@ -39,7 +41,7 @@ async def test_persons_id(elasticsearch_client, session_client, redis_client):
     redis_response = await _get_from_redis_cache(redis_client, redis_key)
 
     # 5. Проверяем ответ
-    assert status == 200
+    assert status == HTTPStatus.OK
     assert body['id'] == es_data[settings.es_id_field]
     assert redis_response['id'] == es_data[settings.es_id_field]
 
@@ -63,17 +65,14 @@ async def test_persons_films_by_id(elasticsearch_client, session_client, redis_c
                               '_id': f_es_data[f_settings.es_id_field]}}),
         json.dumps(f_es_data)
     ]
-
     str_query = '\n'.join(bulk_query) + '\n'
 
     # 2. Загружаем данные в ES
-
     response = await elasticsearch_client.bulk(str_query, refresh=True)
     if response['errors']:
         raise Exception('Ошибка записи данных в Elasticsearch', response)
 
     # 3. Запрашиваем данные из ES по API
-
     url = p_settings.service_url + p_settings.api_uri + '/' + \
           str(p_es_data[p_settings.es_id_field]) + '/film/'
     async with session_client.get(url, params=p_settings.query_data) as response:
@@ -81,13 +80,11 @@ async def test_persons_films_by_id(elasticsearch_client, session_client, redis_c
         status = response.status
 
     # 4. Загружаем кэш из Redis
-
     redis_key = f'api/v1/persons/{str(p_es_data["id"])}/film/'
-
     redis_response = await _get_from_redis_cache(redis_client, redis_key)
 
     # 5. Проверяем ответ
-    assert status == 200
+    assert status == HTTPStatus.OK
     assert f_es_data[p_settings.es_id_field] in (i['id'] for i in body['results'])
     film = list(filter(lambda x: x['_id'] == f_es_data['id'], redis_response))
     assert p_es_data["id"] in list((i['id'] for i in film[0]['_source']['actors']))

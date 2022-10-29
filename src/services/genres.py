@@ -1,19 +1,19 @@
 import json
-from functools import lru_cache
+import functools
 
-from aioredis import Redis
-from elasticsearch import AsyncElasticsearch
 from fastapi import Depends
 
+from db.abstract import AsyncCacheStorage
+from db.abstract import AsyncSearchEngine
 from db.elastic import get_elastic
 from db.redis import get_redis
 from core.config import FILM_CACHE_EXPIRE_IN_SECONDS
 
 
 class GenreService:
-    def __init__(self, redis: Redis, elastic: AsyncElasticsearch):
-        self.redis = redis
-        self.elastic = elastic
+    def __init__(self, cache: AsyncCacheStorage, text_search: AsyncSearchEngine):
+        self.cache = cache
+        self.text_search = text_search
 
     async def get_genres(self, redis_key):
         genres = await self._film_from_cache(redis_key)
@@ -40,14 +40,14 @@ class GenreService:
             query_body = {
                 'query': {'match_all': {},},
             }
-            result = await self.elastic.search(
+            result = await self.text_search.search(
                 index='genres', body=query_body, from_=offset, size=limit
             )
             return result
 
     async def _get_genre_by_id_from_elastic(self, genre_id: str):
         query_body = {'query': {'match': {'_id': genre_id}}}
-        genre = await self.elastic.search(index='genres', body=query_body)
+        genre = await self.text_search.search(index='genres', body=query_body)
         return genre
 
     async def _put_result_to_cache(self, redis_key, data):  # TODO Проверить модель Film
@@ -57,12 +57,12 @@ class GenreService:
         if data:
             try:
                 d = json.dumps(data)
-                await self.redis.set(redis_key, value=d, expire=FILM_CACHE_EXPIRE_IN_SECONDS)
+                await self.cache.set(redis_key, value=d, expire=FILM_CACHE_EXPIRE_IN_SECONDS)
             except Exception as e:
                 print('exep', e)
 
     async def _film_from_cache(self, redis_key: str):
-        data = await self.redis.get(redis_key)
+        data = await self.cache.get(redis_key)
         out = None
         try:
             out = json.loads(data)
@@ -76,7 +76,7 @@ class GenreService:
 # Используем lru_cache-декоратор, чтобы создать объект сервиса в едином экземпляре (синглтона)
 @lru_cache()
 def get_genre_service(
-    redis: Redis = Depends(get_redis),
-    elastic: AsyncElasticsearch = Depends(get_elastic),
+    cache: AsyncCacheStorage = Depends(get_redis),
+    text_search: AsyncSearchEngine = Depends(get_elastic),
 ) -> GenreService:
-    return GenreService(redis, elastic)
+    return GenreService(cache, text_search)

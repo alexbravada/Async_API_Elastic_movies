@@ -1,20 +1,21 @@
 import json
 from http import HTTPStatus
 from typing import Dict
-from aioredis import Redis
-from elasticsearch import AsyncElasticsearch
+
 from fastapi import Depends, HTTPException
 from pydantic.tools import lru_cache
 from core.config import FILM_CACHE_EXPIRE_IN_SECONDS
+from db.abstract import AsyncCacheStorage
+from db.abstract import AsyncSearchEngine
 from db.elastic import get_elastic
 from db.redis import get_redis
 from models.film import Person
 
 
 class PersonService:
-    def __init__(self, redis: Redis, elastic: AsyncElasticsearch):
-        self.redis = redis
-        self.elastic = elastic
+    def __init__(self, cache: AsyncCacheStorage, text_search: AsyncSearchEngine):
+        self.cache = cache
+        self.text_search = text_search
 
     async def get_person_by_id(self, redis_key, person_id: str):
         films = await self._person_from_cache(redis_key)
@@ -91,7 +92,7 @@ class PersonService:
 
     async def _get_person_full_name_by_id(self, person_id: str):
         query_body = {'query': {'match': {'id': person_id}}}
-        result = await self.elastic.search(index='persons', body=query_body)
+        result = await self.text_search.search(index='persons', body=query_body)
         try:
             return result['hits']['hits'][0]['_source']['full_name']
         except IndexError:
@@ -100,7 +101,7 @@ class PersonService:
     async def _get_films_by_person_full_name(self, type, person_name: str):
         query_body = {'query': {'match_phrase': {type: person_name}}}
         try:
-            result = await self.elastic.search(index='movies', body=query_body)
+            result = await self.text_search.search(index='movies', body=query_body)
 
             if len(result['hits']['hits']) > 0:
                 return [i['_id'] for i in result['hits']['hits']]
@@ -121,7 +122,7 @@ class PersonService:
                 'query': {'match_all': {},},
                 'sort': {**sort},
             }
-            result = await self.elastic.search(
+            result = await self.text_search.search(
                 index='movies', body=query_body, from_=offset, size=limit
             )
             return result
@@ -130,7 +131,7 @@ class PersonService:
                 'query': {'bool': {'filter': {'match': {**filter_by}}}},
                 'sort': {**sort},
             }
-            result = await self.elastic.search(
+            result = await self.text_search.search(
                 index='movies', body=query_body, from_=offset, size=limit
             )
 
@@ -143,7 +144,7 @@ class PersonService:
         query_body = {
             'query': {'query_string': {'default_field': 'full_name', 'query': query},},
         }
-        result = await self.elastic.search(
+        result = await self.text_search.search(
             index='persons', body=query_body, from_=offset, size=limit
         )
 
@@ -152,7 +153,7 @@ class PersonService:
         return result['hits']['hits']
 
     async def _person_from_cache(self, redis_key: str):
-        data = await self.redis.get(redis_key)
+        data = await self.cache.get(redis_key)
         out = None
         try:
             out = json.loads(data)
@@ -169,14 +170,14 @@ class PersonService:
         if data:
             try:
                 d = json.dumps(data)
-                await self.redis.set(redis_key, value=d, expire=FILM_CACHE_EXPIRE_IN_SECONDS)
+                await self.cache.set(redis_key, value=d, expire=FILM_CACHE_EXPIRE_IN_SECONDS)
             except Exception as e:
                 print('exep', e)
 
 
 @lru_cache()
 def get_persons_service(
-    redis: Redis = Depends(get_redis),
-    elastic: AsyncElasticsearch = Depends(get_elastic),
+    cache: AsyncCacheStorage = Depends(get_redis),
+    text_search: AsyncSearchEngine = Depends(get_elastic),
 ) -> PersonService:
-    return PersonService(redis, elastic)
+    return PersonService(cache, text_search)

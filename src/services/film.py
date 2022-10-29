@@ -1,20 +1,21 @@
-from functools import lru_cache
+from functools import cache, lru_cache
 from typing import Dict, Optional
 import json
-from aioredis import Redis
-from elasticsearch import AsyncElasticsearch
 from fastapi import Depends
 
+from db.abstract import AsyncCacheStorage
+from db.abstract import AsyncSearchEngine
 from db.elastic import get_elastic
 from db.redis import get_redis
+
 from models.film import Film
 from core.config import FILM_CACHE_EXPIRE_IN_SECONDS
 
 
 class FilmService:
-    def __init__(self, redis: Redis, elastic: AsyncElasticsearch):
-        self.redis = redis
-        self.elastic = elastic
+    def __init__(self, cache: AsyncCacheStorage, text_search: AsyncSearchEngine):
+        self.cache = cache
+        self.text_search = text_search
 
     # get_by_id возвращает объект фильма. Он опционален, так как фильм может отсутствовать в базе
     async def get_by_id(self, redis_key: str, film_id: str) -> Optional[Film]:
@@ -82,7 +83,7 @@ class FilmService:
             query_body = {
                 'query': {'query_string': {'fields': default_fields_list, 'query': query},},
             }
-            result = await self.elastic.search(
+            result = await self.text_search.search(
                 index='movies', body=query_body, from_=offset, size=limit
             )
             if len(result['hits']['hits']) == 0:
@@ -91,7 +92,7 @@ class FilmService:
 
     async def _get_movie_by_id(self, film_id: str):
         query_body = {'query': {'match': {'id': film_id}}}
-        result = await self.elastic.search(index='movies', body=query_body)
+        result = await self.text_search.search(index='movies', body=query_body)
         try:
             film = result['hits']['hits'][0]
         except IndexError:
@@ -103,7 +104,7 @@ class FilmService:
     ):
         sort = {'imdb_rating': 'desc'}
         query_body = {'query': {'match': {'genre': genre_id}}, 'sort': [sort]}
-        result = await self.elastic.search(
+        result = await self.text_search.search(
             index='movies', body=query_body, from_=offset, size=limit
         )
         if len(result['hits']['hits']) == 0:
@@ -138,7 +139,7 @@ class FilmService:
             return result
 
     async def _film_from_cache(self, redis_key: str):
-        data = await self.redis.get(redis_key)
+        data = await self.cache.get(redis_key)
         out = None
         try:
             out = json.loads(data)
@@ -155,7 +156,7 @@ class FilmService:
         if data:
             try:
                 d = json.dumps(data)
-                await self.redis.set(redis_key, value=d, expire=FILM_CACHE_EXPIRE_IN_SECONDS)
+                await self.cache.set(redis_key, value=d, expire=FILM_CACHE_EXPIRE_IN_SECONDS)
             except Exception as e:
                 print('exep', e)
 
@@ -166,7 +167,7 @@ class FilmService:
 # Используем lru_cache-декоратор, чтобы создать объект сервиса в едином экземпляре (синглтона)
 @lru_cache()
 def get_film_service(
-    redis: Redis = Depends(get_redis),
-    elastic: AsyncElasticsearch = Depends(get_elastic),
+    cache: AsyncCacheStorage = Depends(get_redis),
+    text_search: AsyncSearchEngine = Depends(get_elastic),
 ) -> FilmService:
-    return FilmService(redis, elastic)
+    return FilmService(cache, text_search)

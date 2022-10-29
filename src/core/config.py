@@ -1,10 +1,11 @@
-from dataclasses import Field
 import os
-from logging import config as logging_config
-from fastapi.responses import ORJSONResponse
 
+from logging import config as logging_config
+from typing import List, Dict, Any
+from fastapi.responses import ORJSONResponse
 from core.logger import LOGGING
-from pydantic import BaseSettings, RedisDsn
+from pydantic import BaseSettings, RedisDsn, Field
+
 # Применяем настройки логирования
 logging_config.dictConfig(LOGGING)
 
@@ -20,7 +21,7 @@ ELASTIC_HOST = os.getenv('ELASTIC_HOST', '127.0.0.1')
 ELASTIC_PORT = int(os.getenv('ELASTIC_PORT', 9200))
 
 # Время жизни кэшированного запроса
-FILM_CACHE_EXPIRE_IN_SECONDS = 60 * 5  # 5 минут
+FILM_CACHE_EXPIRE_IN_SECONDS = int(os.getenv('FILM_CACHE_EXPIRE_IN_SECONDS', 60 * 5))  # 5 минут
 
 # Корень проекта
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
